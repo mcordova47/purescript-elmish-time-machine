@@ -1,0 +1,34 @@
+{
+  "name": "purescript-elmish-time-machine",
+  "version": "0.1.0",
+  "description": "Time travel debug tool for purescript-elmish",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcordova47/purescript-elmish-time-machine.git"
+  },
+  "keywords": [
+    "purescript",
+    "elmish",
+    "time",
+    "travel"
+  ],
+  "author": {
+    "name": "Marc Cordova",
+    "url": "https://github.com/mcordova47"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mcordova47/purescript-elmish-time-machine/issues"
+  },
+  "homepage": "https://github.com/mcordova47/purescript-elmish-time-machine#readme",
+  "devDependencies": {
+    "purescript": "^0.15.15",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "spago": "^0.21.0"
+  }
+}

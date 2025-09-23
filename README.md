@@ -1,2 +1,3 @@
 # purescript-elmish-time-machine
-Time travel debug tools for purescript-elmish
+
+Time travel debug tool for purescript-elmish
