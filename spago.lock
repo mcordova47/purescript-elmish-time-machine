@@ -6,7 +6,6 @@
         "core": {
           "dependencies": [
             "arrays",
-            "console",
             "debug",
             "effect",
             "elmish",
