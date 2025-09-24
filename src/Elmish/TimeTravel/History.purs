@@ -1,4 +1,4 @@
-module TimeTravel.History
+module Elmish.TimeMachine.History
   ( History
   , Message
   , formatMessage

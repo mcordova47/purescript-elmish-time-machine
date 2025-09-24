@@ -1,10 +1,10 @@
-module TimeTravel
+module Elmish.TimeMachine
   ( Expanded
   , Keybindings
   , Message
   , Section
-  , withTimeTravel
-  , withTimeTravel'
+  , withTimeMachine
+  , withTimeMachine'
   )
   where
 
@@ -24,8 +24,8 @@ import Elmish.HTML as H
 import Elmish.React (class ReactChildren)
 import Elmish.Subscription (Subscription(..))
 import Record as Record
-import TimeTravel.History (History, formatMessage, formatState)
-import TimeTravel.History as History
+import Elmish.TimeMachine.History (History, formatMessage, formatState)
+import Elmish.TimeMachine.History as History
 import Web.DOM (Element)
 import Web.DOM.Document (createElement) as DOM
 import Web.DOM.Element as Element
@@ -75,22 +75,25 @@ type Keybindings =
   { toggle :: KeyboardEvent -> Boolean
   }
 
-withTimeTravel ::
+-- | Wraps a `ComponentDef` to add a "time machine" debug tool to the Elmish UI
+withTimeMachine ::
   forall m msg state
   . Debug.DebugWarning
   => MonadEffect m
   => Functor m
   => ComponentDef' m msg state
   -> ComponentDef' m (Message msg) (State msg state)
-withTimeTravel =
-  withTimeTravel'
+withTimeMachine =
+  withTimeMachine'
     { toggle: \e ->
         (KeyboardEvent.ctrlKey e || KeyboardEvent.metaKey e) &&
         KeyboardEvent.altKey e &&
         KeyboardEvent.code e == "KeyZ"
     }
 
-withTimeTravel' ::
+-- | A version of `withTimeMachine` that allows configuring the keybinding for
+-- | showing/hiding the time machine
+withTimeMachine' ::
   forall m msg state
   . Debug.DebugWarning
   => MonadEffect m
@@ -98,7 +101,7 @@ withTimeTravel' ::
   => Keybindings
   -> ComponentDef' m msg state
   -> ComponentDef' m (Message msg) (State msg state)
-withTimeTravel' keybindings def = { init, update, view }
+withTimeMachine' keybindings def = { init, update, view }
   where
     init = do
       subscribe Keydown keydownSub
