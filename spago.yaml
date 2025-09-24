@@ -21,6 +21,9 @@ package:
   publish:
     version: 0.3.0
     license: MIT
+    location:
+      githubOwner: mcordova47
+      githubRepo: purescript-elmish-time-machine
 workspace:
   extraPackages: {}
   packageSet:
