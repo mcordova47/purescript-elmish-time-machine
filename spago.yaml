@@ -18,7 +18,7 @@ package:
   - web-events
   - web-html
   - web-uievents
-  name: my-project
+  name: elmish-time-machine
 workspace:
   extra_packages: {}
   package_set:

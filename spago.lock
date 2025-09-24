@@ -1,7 +1,7 @@
 {
   "workspace": {
     "packages": {
-      "my-project": {
+      "elmish-time-machine": {
         "path": "./",
         "core": {
           "dependencies": [
