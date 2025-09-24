@@ -1,0 +1,25 @@
+package:
+  dependencies:
+  - arrays
+  - console
+  - debug
+  - effect
+  - elmish
+  - elmish-html
+  - foldable-traversable
+  - functions
+  - lists
+  - maybe
+  - ordered-collections
+  - prelude
+  - record
+  - tuples
+  - web-dom
+  - web-events
+  - web-html
+  - web-uievents
+  name: my-project
+workspace:
+  extra_packages: {}
+  package_set:
+    url: https://raw.githubusercontent.com/purescript/package-sets/psc-0.15.15-20250916/packages.json
