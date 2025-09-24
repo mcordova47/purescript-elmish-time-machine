@@ -140,7 +140,7 @@ track (History h) msg next = History
   , future: Nil
   }
 
--- | Jumps to a certain distance, i.e. by a certain number of steps forward or
+-- | Jumps to a certain index, i.e. by a certain number of steps forward or
 -- | backwards
 jump :: forall msg s. Int -> History msg s -> History msg s
 jump index history
