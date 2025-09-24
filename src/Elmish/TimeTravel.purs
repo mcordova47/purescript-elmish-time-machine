@@ -2,7 +2,6 @@ module Elmish.TimeMachine
   ( Expanded
   , Keybindings
   , Message
-  , Section
   , withTimeMachine
   , withTimeMachine'
   )
@@ -71,6 +70,8 @@ data Section
 derive instance Eq Section
 derive instance Ord Section
 
+-- | A record of keybindings, each represented by a predicate function which
+-- | returns true iff a `KeyboardEvent` should trigger the given command
 type Keybindings =
   { toggle :: KeyboardEvent -> Boolean
   }
@@ -167,7 +168,7 @@ withTimeMachine' keybindings def = { init, update, view }
                         "↩️"
                     , H.em { style: H.css { color: "gray" } } $
                         formatMessage false $
-                          History.presentMessage history
+                          History.latestMessage history
                     , button
                         { onClick: dispatch <| Redo
                         , disabled: not History.hasFuture history
@@ -199,7 +200,7 @@ withTimeMachine' keybindings def = { init, update, view }
                             { section: Present, expanded: sections, last: false }
                             [ H.h6 {} "Last Message"
                             , H.pre {} $
-                                formatMessage true $ History.presentMessage history
+                                formatMessage true $ History.latestMessage history
                             , H.h6 {} "Current State"
                             , H.pre {} $
                                 formatState $ History.presentState history
