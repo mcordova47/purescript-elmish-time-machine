@@ -19,7 +19,7 @@ package:
     - web-html: ">=4.1.0 <5.0.0"
     - web-uievents: ">=5.0.0 <6.0.0"
   publish:
-    version: 0.3.0
+    version: 0.3.1
     license: MIT
     location:
       githubOwner: mcordova47
