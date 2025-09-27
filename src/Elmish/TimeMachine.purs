@@ -18,8 +18,9 @@ import Data.Set (Set)
 import Data.Set as Set
 import Debug as Debug
 import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
-import Elmish (ComponentDef', ReactElement, forks, lmap, subscribe, (<|))
+import Effect.Aff (Milliseconds(..), delay)
+import Effect.Class (liftEffect)
+import Elmish (ComponentDef, ReactElement, fork, forks, lmap, subscribe, (<|))
 import Elmish.Component (ComponentName(..), wrapWithLocalState)
 import Elmish.HTML.Styled as H
 import Elmish.Subscription (Subscription(..))
@@ -49,6 +50,9 @@ data Message msg
   | Play
   | Pause
   | Stop
+  | Rewind
+  | FastForward
+  | TimeTravel
   -- UI
   | ToggleExpanded
   | ToggleSection Section
@@ -67,6 +71,8 @@ data Activity
   = Playing
   | Paused
   | Stopped
+  | Rewinding
+  | FastForwarding
 derive instance Eq Activity
 
 data Expanded
@@ -88,12 +94,10 @@ type Keybindings =
 
 -- | Wraps a `ComponentDef` to add a "time machine" debug tool to the Elmish UI
 withTimeMachine ::
-  forall m msg state
+  forall msg state
   . Debug.DebugWarning
-  => MonadEffect m
-  => Functor m
-  => ComponentDef' m msg state
-  -> ComponentDef' m (Message msg) (State msg state)
+  => ComponentDef msg state
+  -> ComponentDef (Message msg) (State msg state)
 withTimeMachine =
   withTimeMachine'
     { toggle: \e ->
@@ -105,13 +109,11 @@ withTimeMachine =
 -- | A version of `withTimeMachine` that allows configuring the keybinding for
 -- | showing/hiding the time machine
 withTimeMachine' ::
-  forall m msg state
+  forall msg state
   . Debug.DebugWarning
-  => MonadEffect m
-  => Functor m
   => Keybindings
-  -> ComponentDef' m msg state
-  -> ComponentDef' m (Message msg) (State msg state)
+  -> ComponentDef msg state
+  -> ComponentDef (Message msg) (State msg state)
 withTimeMachine' keybindings def = { init, update, view }
   where
     init = do
@@ -133,6 +135,8 @@ withTimeMachine' keybindings def = { init, update, view }
             Playing -> History.track
             Paused -> History.stash
             Stopped -> const <<< const
+            Rewinding -> const <<< const
+            FastForwarding -> const <<< const
         pure state { history = track state.history msg next }
       Undo ->
         pure state { history = History.undo state.history }
@@ -151,6 +155,33 @@ withTimeMachine' keybindings def = { init, update, view }
         pure state
           { history = History.stop state.history
           , activity = Stopped
+          }
+      Rewind -> do
+        fork $ pure TimeTravel
+        pure state { activity = Rewinding }
+      FastForward -> do
+        fork $ pure TimeTravel
+        pure state { activity = FastForwarding }
+      TimeTravel -> do
+        let
+          activity = case state.activity of
+            Rewinding
+              | History.hasPast state.history -> state.activity
+              | otherwise -> Paused
+            FastForwarding
+              | History.hasFuture state.history -> state.activity
+              | otherwise -> Playing
+            _ -> state.activity
+        when (activity == Rewinding || activity == FastForwarding) $
+          fork do
+            delay $ Milliseconds 100.0
+            pure TimeTravel
+        pure state
+          { history = case activity of
+              Rewinding -> History.undo state.history
+              FastForwarding -> History.redo state.history
+              _ -> state.history
+          , activity = activity
           }
       ToggleExpanded ->
         pure state { expanded = toggle state.expanded }
@@ -242,42 +273,94 @@ withTimeMachine' keybindings def = { init, update, view }
           H.div "etm-section etm-d-flex etm-p-sm"
           [ undoButton "etm-icon-btn"
           , redoButton "etm-icon-btn"
-            -- Rewind
+          , rewindButton
           , playPauseButton
           , stopButton
-            -- Fast forward
+          , fastForwardButton
           ]
 
         undoButton className =
           H.button_ ("etm-btn " <> className)
             { onClick: dispatch <| Undo
             , disabled: not History.hasPast history
+            , title
+            , "aria-label": title
             }
             "↩️"
+          where
+            title = "Undo"
 
         redoButton className =
           H.button_ ("etm-btn " <> className)
             { onClick: dispatch <| Redo
             , disabled: not History.hasFuture history
+            , title
+            , "aria-label": title
             }
             "↪️"
+          where
+            title = "Redo"
 
         playPauseButton =
-          H.button_ "etm-btn etm-icon-btn etm-ml-auto"
-            { onClick: dispatch <| case activity of
-                Playing -> Pause
-                _ -> Play
+          case activity of
+            Playing -> pauseButton
+            Paused -> playButton
+            Stopped -> playButton
+            Rewinding -> pauseButton
+            FastForwarding -> pauseButton
+
+        playButton =
+          H.button_ "etm-btn etm-icon-btn"
+            { onClick: dispatch <| Play
+            , title
+            , "aria-label": title
             }
-            case activity of
-              Playing -> "⏸️"
-              _ -> "▶️"
+            "▶️"
+          where
+            title = "Play (Jump to end of history and continue live updates)"
+
+        pauseButton =
+          H.button_ "etm-btn etm-icon-btn"
+            { onClick: dispatch <| Pause
+            , title
+            , "aria-label": title
+            }
+            "⏸️"
+          where
+            title = "Pause (Stash any future updates)"
 
         stopButton =
           H.button_ "etm-btn etm-icon-btn"
             { onClick: dispatch <| Stop
             , disabled: activity == Stopped
+            , title
+            , "aria-label": title
             }
             "⏹️"
+          where
+            title = "Stop (Stop updates and erase future)"
+
+        rewindButton =
+          H.button_ "etm-btn etm-icon-btn etm-ml-auto"
+            { onClick: dispatch <| Rewind
+            , disabled: activity == Rewinding || not History.hasPast history
+            , title
+            , "aria-label": title
+            }
+            "⏪"
+          where
+            title = "Rewind"
+
+        fastForwardButton =
+          H.button_ "etm-btn etm-icon-btn"
+            { onClick: dispatch <| FastForward
+            , disabled: activity == FastForwarding || not History.hasFuture history
+            , title
+            , "aria-label": title
+            }
+            "⏩"
+          where
+            title = "Fast Forward"
 
         whenExpanded f =
           case expanded of
