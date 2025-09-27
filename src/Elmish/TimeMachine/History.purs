@@ -170,6 +170,7 @@ play history
   | not hasFuture history = history
   | otherwise = play $ redo history
 
+-- | Clears the future state, for when the stop button is pressed
 stop :: forall msg s. History msg s -> History msg s
 stop (History h) = History h
   { future = Nil }
