@@ -11,10 +11,12 @@ module Elmish.TimeMachine.History
   , init
   , jump
   , latestMessage
+  , live
   , past
   , present
   , presentState
   , redo
+  , stash
   , track
   , undo
   )
@@ -140,6 +142,11 @@ track (History h) msg next = History
   , future: Nil
   }
 
+-- | For the case where the history is paused, stash changes in the future
+stash :: forall msg s. History msg s -> msg -> s -> History msg s
+stash (History h) msg next = History h
+  { future = List.snoc h.future (Message msg /\ next) }
+
 -- | Jumps the given distance, i.e. by a certain number of steps forward or
 -- | backwards
 jump :: forall msg s. Int -> History msg s -> History msg s
@@ -152,6 +159,12 @@ jump distance history
     jump (distance + 1) $ undo history
   | otherwise =
     history
+
+-- | Go to the end state of the history
+live :: forall msg s. History msg s -> History msg s
+live history
+  | hasFuture history = live $ redo history
+  | otherwise = history
 
 -- Display
 

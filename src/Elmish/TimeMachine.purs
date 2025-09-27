@@ -45,6 +45,7 @@ data Message msg
   | Undo
   | Redo
   | Jump Int
+  | TogglePaused
   -- UI
   | ToggleExpanded
   | ToggleSection Section
@@ -53,6 +54,7 @@ data Message msg
 
 type State msg s =
   { history :: History msg s
+  , paused :: Boolean
   , visible :: Boolean
   , expanded :: Expanded
   , keybindings :: Keybindings
@@ -108,6 +110,7 @@ withTimeMachine' keybindings def = { init, update, view }
       state <- def.init # lmap Message
       pure
         { history: History.init state
+        , paused: false
         , visible: true
         , expanded: Collapsed
         , keybindings
@@ -116,13 +119,19 @@ withTimeMachine' keybindings def = { init, update, view }
     update state = case _ of
       Message msg -> do
         next <- def.update (History.presentState state.history) msg # lmap Message
-        pure state { history = History.track state.history msg next }
+        let track = if state.paused then History.stash else History.track
+        pure state { history = track state.history msg next }
       Undo ->
         pure state { history = History.undo state.history }
       Redo ->
         pure state { history = History.redo state.history }
       Jump index ->
         pure state { history = History.jump index state.history }
+      TogglePaused ->
+        pure state
+          { history = History.live state.history
+          , paused = not state.paused
+          }
       ToggleExpanded ->
         pure state { expanded = toggle state.expanded }
       ToggleSection section | Expanded sections <- state.expanded ->
@@ -138,7 +147,7 @@ withTimeMachine' keybindings def = { init, update, view }
           Expanded _ -> Collapsed
           Collapsed -> Expanded $ Set.singleton Present
 
-    view { history, visible, expanded } dispatch =
+    view { history, paused, visible, expanded } dispatch =
       H.fragment
       [ def.view (History.presentState history) $ dispatch <<< Message
       , guard visible $
@@ -155,19 +164,11 @@ withTimeMachine' keybindings def = { init, update, view }
       where
         header =
           H.div "etm-header"
-          [ H.button_ "etm-btn"
-              { onClick: dispatch <| Undo
-              , disabled: not History.hasPast history
-              }
-              "↩️"
+          [ whenCollapsed undoButton
           , H.code "etm-code" $
               formatMessage false $
                 History.latestMessage history
-          , H.button_ "etm-btn"
-              { onClick: dispatch <| Redo
-              , disabled: not History.hasFuture history
-              }
-              "↪️"
+          , whenCollapsed redoButton
           , H.button_ "etm-btn etm-ml-auto"
               { onClick: dispatch <| ToggleExpanded
               , disabled: false
@@ -177,27 +178,25 @@ withTimeMachine' keybindings def = { init, update, view }
                 Collapsed -> "▶"
           ]
 
-        body = case expanded of
-          Expanded sections ->
-            H.div "etm-body"
-            [ section
-                { section: Past, expanded: sections, bodyClass: "" } $
-                historyEvent <$> History.past history
-            , section
-                { section: Present, expanded: sections, bodyClass: "etm-px-sm" }
-                [ H.h6 "" "Last Message"
-                , H.pre "etm-code-block" $
-                    formatMessage true $ History.latestMessage history
-                , H.h6 "" "Current State"
-                , H.pre "etm-code-block" $
-                    formatState $ History.presentState history
-                ]
-            , section
-                { section: Future, expanded: sections, bodyClass: "" } $
-                historyEvent <$> History.future history
-            ]
-          Collapsed ->
-            H.empty
+        body = whenExpanded \sections ->
+          H.div "etm-body"
+          [ controls
+          , section
+              { section: Past, expanded: sections, bodyClass: "" } $
+              historyEvent <$> History.past history
+          , section
+              { section: Present, expanded: sections, bodyClass: "etm-px-sm" }
+              [ H.h6 "" "Last Message"
+              , H.pre "etm-code-block" $
+                  formatMessage true $ History.latestMessage history
+              , H.h6 "" "Current State"
+              , H.pre "etm-code-block" $
+                  formatState $ History.presentState history
+              ]
+          , section
+              { section: Future, expanded: sections, bodyClass: "" } $
+              historyEvent <$> History.future history
+          ]
 
         historyEvent { index, message } =
           H.pre_ "etm-history-event"
@@ -218,6 +217,41 @@ withTimeMachine' keybindings def = { init, update, view }
           , guard (Set.member props.section props.expanded) $
               H.div ("etm-section-body " <> props.bodyClass) content
           ]
+
+        controls =
+          H.div "etm-section etm-d-flex"
+          [ undoButton
+          , redoButton
+            -- Rewind
+          , H.button_ "etm-btn etm-ml-auto"
+              { onClick: dispatch <| TogglePaused }
+              if paused then "▶️" else "⏸️"
+            -- Fast forward
+          ]
+
+        undoButton =
+          H.button_ "etm-btn"
+            { onClick: dispatch <| Undo
+            , disabled: not History.hasPast history
+            }
+            "↩️"
+
+        redoButton =
+          H.button_ "etm-btn"
+            { onClick: dispatch <| Redo
+            , disabled: not History.hasFuture history
+            }
+            "↪️"
+
+        whenExpanded f =
+          case expanded of
+            Expanded sections -> f sections
+            Collapsed -> H.empty
+
+        whenCollapsed content =
+          case expanded of
+            Collapsed -> content
+            Expanded _ -> H.empty
 
     keydownSub = Subscription \dispatch -> liftEffect do
       listener <- eventListener \e -> case KeyboardEvent.fromEvent e of
@@ -353,5 +387,9 @@ stylesheet = H.style ""
 
     code.etm-code {
       color: #656565 !important;
+    }
+
+    .etm-d-flex {
+      display: flex !important;
     }
   """
