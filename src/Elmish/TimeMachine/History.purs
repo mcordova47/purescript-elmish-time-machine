@@ -140,23 +140,24 @@ track (History h) msg next = History
   , future: Nil
   }
 
--- | Jumps to a certain index, i.e. by a certain number of steps forward or
+-- | Jumps the given distance, i.e. by a certain number of steps forward or
 -- | backwards
 jump :: forall msg s. Int -> History msg s -> History msg s
-jump index history
-  | index > 0
+jump distance history
+  | distance > 0
   , hasFuture history =
-    jump (index - 1) $ redo history
-  | index < 0
+    jump (distance - 1) $ redo history
+  | distance < 0
   , hasPast history =
-    jump (index + 1) $ undo history
+    jump (distance + 1) $ undo history
   | otherwise =
     history
 
 -- Display
 
 -- | Formats a message (using its JS representation)
--- | E.g. `SetFoo2 {"value0": 1}`
+-- |
+-- | E.g. `SetFoo 1` might look like `SetFoo2 {"value0": 1}`
 formatMessage :: forall msg. Boolean -> Message msg -> String
 formatMessage full = case _ of
   Init -> "Initial State"

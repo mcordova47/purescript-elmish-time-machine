@@ -9,9 +9,10 @@ module Elmish.TimeMachine
 
 import Prelude
 
-import Data.Foldable (for_)
+import Data.Foldable (fold, for_)
 import Data.Function.Uncurried (Fn2, runFn2)
 import Data.Maybe (Maybe(..))
+import Data.Monoid (guard)
 import Data.Set (Set)
 import Data.Set as Set
 import Debug as Debug
@@ -19,10 +20,8 @@ import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Elmish (ComponentDef', ReactElement, forks, lmap, subscribe, (<|))
 import Elmish.Component (ComponentName(..), wrapWithLocalState)
-import Elmish.HTML as H
-import Elmish.React (class ReactChildren)
+import Elmish.HTML.Styled as H
 import Elmish.Subscription (Subscription(..))
-import Record as Record
 import Elmish.TimeMachine.History (History, formatMessage, formatState)
 import Elmish.TimeMachine.History as History
 import Web.DOM (Element)
@@ -142,152 +141,83 @@ withTimeMachine' keybindings def = { init, update, view }
     view { history, visible, expanded } dispatch =
       H.fragment
       [ def.view (History.presentState history) $ dispatch <<< Message
-      , if visible then
+      , guard visible $
           portal
             { id: "tardis-time-machine"
             , content:
-                H.div
-                  { style: H.css
-                      { position: "fixed"
-                      , bottom: "1rem"
-                      , right: "1rem"
-                      , border: "1px solid lightgray"
-                      , borderRadius: "0.5rem"
-                      , backgroundColor: "white"
-                      , width: "300px"
-                      }
-                  , tabIndex: -1
-                  }
-                  [ H.div
-                    { style: H.css { display: "flex", alignItems: "center", padding: "0.75rem" }
-                    }
-                    [ button
-                        { onClick: dispatch <| Undo
-                        , disabled: not History.hasPast history
-                        }
-                        "↩️"
-                    , H.em { style: H.css { color: "gray" } } $
-                        formatMessage false $
-                          History.latestMessage history
-                    , button
-                        { onClick: dispatch <| Redo
-                        , disabled: not History.hasFuture history
-                        }
-                        "↪️"
-                    , button'
-                        { onClick: dispatch <| ToggleExpanded
-                        , disabled: false
-                        , style: H.css $ Record.merge (buttonStyle false) { marginLeft: "auto" }
-                        }
-                        case expanded of
-                          Expanded _ -> "▼"
-                          Collapsed -> "▶"
-                    ]
-                  , case expanded of
-                      Expanded sections ->
-                        H.div
-                        { style: H.css
-                            { padding: "0.75rem 0"
-                            , borderTop: "1px solid lightgray"
-                            , maxHeight: "500px"
-                            , overflow: "auto"
-                            }
-                        }
-                        [ section
-                            { section: Past, expanded: sections, last: false } $
-                            historyEvent <$> History.past history
-                        , section
-                            { section: Present, expanded: sections, last: false }
-                            [ H.h6 {} "Last Message"
-                            , H.pre {} $
-                                formatMessage true $ History.latestMessage history
-                            , H.h6 {} "Current State"
-                            , H.pre {} $
-                                formatState $ History.presentState history
-                            ]
-                        , section
-                            { section: Future, expanded: sections, last: true } $
-                            historyEvent <$> History.future history
-                        ]
-                      Collapsed ->
-                        H.empty
-                  ]
+                H.div_ "etm-container" { tabIndex: -1 }
+                [ header
+                , body
+                ]
             }
-        else
-          H.empty
+      , stylesheet
       ]
       where
+        header =
+          H.div "etm-header"
+          [ H.button_ "etm-btn"
+              { onClick: dispatch <| Undo
+              , disabled: not History.hasPast history
+              }
+              "↩️"
+          , H.code "etm-code" $
+              formatMessage false $
+                History.latestMessage history
+          , H.button_ "etm-btn"
+              { onClick: dispatch <| Redo
+              , disabled: not History.hasFuture history
+              }
+              "↪️"
+          , H.button_ "etm-btn etm-ml-auto"
+              { onClick: dispatch <| ToggleExpanded
+              , disabled: false
+              }
+              case expanded of
+                Expanded _ -> "▼"
+                Collapsed -> "▶"
+          ]
+
+        body = case expanded of
+          Expanded sections ->
+            H.div "etm-body"
+            [ section
+                { section: Past, expanded: sections, bodyClass: "" } $
+                historyEvent <$> History.past history
+            , section
+                { section: Present, expanded: sections, bodyClass: "etm-px-sm" }
+                [ H.h6 "" "Last Message"
+                , H.pre "etm-code-block" $
+                    formatMessage true $ History.latestMessage history
+                , H.h6 "" "Current State"
+                , H.pre "etm-code-block" $
+                    formatState $ History.presentState history
+                ]
+            , section
+                { section: Future, expanded: sections, bodyClass: "" } $
+                historyEvent <$> History.future history
+            ]
+          Collapsed ->
+            H.empty
+
         historyEvent { index, message } =
-          H.pre
-            { onClick: dispatch <| Jump index
-            , style: H.css
-                { cursor: "pointer"
-                , overflow: "hidden"
-                , wordWrap: "nowrap"
-                , textOverflow: "ellipsis"
-                }
-            } $
+          H.pre_ "etm-history-event"
+            { onClick: dispatch <| Jump index } $
             formatMessage true message
 
-        section :: forall c. ReactChildren c => _ -> c -> _
         section props content =
-          H.div
-          { style: H.css
-              { borderBottom: if props.last then "none" else "1px solid lightgray"
-              , padding: "0 0.75rem"
-              }
-          }
-          [ H.h6
-            { onClick: dispatch <| ToggleSection props.section
-            , style: H.css
-                { display: "flex"
-                , alignItems: "center"
-                , justifyContent: "space-between"
-                , marginBottom: "0"
-                , cursor: "pointer"
-                , padding: "0.75rem 0"
-                }
-            }
-            [ H.div {} case props.section of
+          H.div "etm-section"
+          [ H.h6_ "etm-section-header"
+            { onClick: dispatch <| ToggleSection props.section }
+            [ H.div "" case props.section of
                 Past -> "Past"
                 Present -> "Present"
                 Future -> "Future"
-            , H.div {}
+            , H.div ""
                 if Set.member props.section props.expanded then "▼" else "▶"
             ]
-          , if Set.member props.section props.expanded then
-              H.div
-                { style: H.css { padding: "0.75rem 0" } }
-                content
-            else
-              H.empty
+          , guard (Set.member props.section props.expanded) $
+              H.div ("etm-section-body " <> props.bodyClass) content
           ]
-
-        button :: forall c. ReactChildren c => _ -> c -> _
-        button { onClick, disabled } =
-          button' { onClick, disabled, style: H.css $ buttonStyle disabled }
-
-        button' :: forall c. ReactChildren c => _ -> c -> _
-        button' { onClick, disabled, style } label =
-          H.button
-            { onClick
-            , disabled
-            , style
-            }
-            label
-
-        buttonStyle disabled =
-          { display: "inline-block"
-          , textAlign: "center"
-          , textDecoration: "none"
-          , verticalAlign: "middle"
-          , cursor: if disabled then "default" else "pointer"
-          , backgroundColor: "transparent"
-          , border: "none"
-          , padding: "0.375rem 0.75rem"
-          , fontSize: "1rem"
-          , borderRadius: "0.25rem"
-          }
 
     keydownSub = Subscription \dispatch -> liftEffect do
       listener <- eventListener \e -> case KeyboardEvent.fromEvent e of
@@ -299,12 +229,10 @@ withTimeMachine' keybindings def = { init, update, view }
       pure $
          liftEffect $ W.window <#> toEventTarget >>= removeEventListener keydown listener false
 
--- Utils
-
 portal :: { id :: String, content :: ReactElement } -> ReactElement
 portal = wrapWithLocalState (ComponentName "Portal") \{ id, content } ->
   { init: do
-      forks \{ dispatch } -> liftEffect $ do
+      forks \{ dispatch } -> liftEffect do
         mContainer <- elementById id
         case mContainer of
           Just container ->
@@ -319,12 +247,8 @@ portal = wrapWithLocalState (ComponentName "Portal") \{ id, content } ->
               dispatch container
       pure Nothing
   , update: \_ container -> pure $ Just container
-  , view: \container _ ->
-      case container of
-        Just c ->
-          createPortal content c
-        Nothing ->
-          H.empty
+  , view: \container _ -> fold $
+      createPortal content <$> container
   }
   where
     elementById :: String -> Effect (Maybe Element)
@@ -338,3 +262,96 @@ createPortal :: ReactElement -> Element -> ReactElement
 createPortal = runFn2 createPortal_
 
 foreign import createPortal_ :: Fn2 ReactElement Element ReactElement
+
+stylesheet :: ReactElement
+stylesheet = H.style ""
+  """
+    div.etm-container {
+      position: fixed !important;
+      bottom: 1rem !important;
+      right: 1rem !important;
+      border: 1px solid lightgray !important;
+      border-radius: 0.5rem !important;
+      background-color: white !important;
+      width: 300px !important;
+    }
+
+    div.etm-header {
+      display: flex !important;
+      align-items: center !important;
+      padding: 0.75rem !important;
+    }
+
+    div.etm-body {
+      padding: 0.75rem 0 !important;
+      border-top: 1px solid lightgray !important;
+      max-height: 500px !important;
+      overflow: auto !important;
+    }
+
+    button.etm-btn {
+      display: inline-block !important;
+      text-align: center !important;
+      text-decoration: none !important;
+      vertical-align: middle !important;
+      cursor: pointer !important;
+      background-color: transparent !important;
+      border: none !important;
+      padding: 0.375rem 0.75rem !important;
+      font-size: 1rem !important;
+      border-radius: 0.25rem !important;
+    }
+
+    button.etm-btn[disabled] {
+      cursor: default !important;
+    }
+
+    .etm-ml-auto {
+      margin-left: auto !important;
+    }
+
+    pre.etm-history-event {
+      cursor: pointer !important;
+      overflow: hidden !important;
+      word-wrap: nowrap !important;
+      text-overflow: ellipsis !important;
+      margin: 0 !important;
+      padding: 0.5rem 0.75rem !important;
+    }
+
+    pre.etm-history-event:hover {
+      background-color: #e6f5ff;
+    }
+
+    div.etm-section {
+      border-bottom: 1px solid lightgray !important;
+    }
+
+    div.etm-section:last-child {
+      border-bottom: none !important;
+    }
+
+    h6.etm-section-header {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      margin-bottom: 0 !important;
+      cursor: pointer !important;
+      padding: 0.75rem !important;
+    }
+
+    .etm-px-sm {
+      padding: 0 0.75rem !important;
+    }
+
+    pre.etm-code-block {
+      background-color: #efefef !important;
+      padding: 0.75rem 0.5rem !important;
+      border: 1px solid lightgray !important;
+      border-radius: 0.25rem !important;
+    }
+
+    code.etm-code {
+      color: #656565 !important;
+    }
+  """
