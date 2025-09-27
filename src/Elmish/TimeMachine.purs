@@ -1,5 +1,6 @@
 module Elmish.TimeMachine
-  ( Expanded
+  ( Activity
+  , Expanded
   , Keybindings
   , Message
   , withTimeMachine
@@ -45,7 +46,9 @@ data Message msg
   | Undo
   | Redo
   | Jump Int
-  | TogglePaused
+  | Play
+  | Pause
+  | Stop
   -- UI
   | ToggleExpanded
   | ToggleSection Section
@@ -54,11 +57,17 @@ data Message msg
 
 type State msg s =
   { history :: History msg s
-  , paused :: Boolean
+  , activity :: Activity
   , visible :: Boolean
   , expanded :: Expanded
   , keybindings :: Keybindings
   }
+
+data Activity
+  = Playing
+  | Paused
+  | Stopped
+derive instance Eq Activity
 
 data Expanded
   = Expanded (Set Section)
@@ -110,7 +119,7 @@ withTimeMachine' keybindings def = { init, update, view }
       state <- def.init # lmap Message
       pure
         { history: History.init state
-        , paused: false
+        , activity: Playing
         , visible: true
         , expanded: Collapsed
         , keybindings
@@ -119,7 +128,11 @@ withTimeMachine' keybindings def = { init, update, view }
     update state = case _ of
       Message msg -> do
         next <- def.update (History.presentState state.history) msg # lmap Message
-        let track = if state.paused then History.stash else History.track
+        let
+          track = case state.activity of
+            Playing -> History.track
+            Paused -> History.stash
+            Stopped -> const <<< const
         pure state { history = track state.history msg next }
       Undo ->
         pure state { history = History.undo state.history }
@@ -127,10 +140,17 @@ withTimeMachine' keybindings def = { init, update, view }
         pure state { history = History.redo state.history }
       Jump index ->
         pure state { history = History.jump index state.history }
-      TogglePaused ->
+      Play ->
         pure state
-          { history = History.live state.history
-          , paused = not state.paused
+          { history = History.play state.history
+          , activity = Playing
+          }
+      Pause ->
+        pure state { activity = Paused }
+      Stop ->
+        pure state
+          { history = History.stop state.history
+          , activity = Stopped
           }
       ToggleExpanded ->
         pure state { expanded = toggle state.expanded }
@@ -147,7 +167,7 @@ withTimeMachine' keybindings def = { init, update, view }
           Expanded _ -> Collapsed
           Collapsed -> Expanded $ Set.singleton Present
 
-    view { history, paused, visible, expanded } dispatch =
+    view { history, activity, visible, expanded } dispatch =
       H.fragment
       [ def.view (History.presentState history) $ dispatch <<< Message
       , guard visible $
@@ -164,11 +184,11 @@ withTimeMachine' keybindings def = { init, update, view }
       where
         header =
           H.div "etm-header"
-          [ whenCollapsed undoButton
+          [ whenCollapsed $ undoButton ""
           , H.code "etm-code" $
               formatMessage false $
                 History.latestMessage history
-          , whenCollapsed redoButton
+          , whenCollapsed $ redoButton ""
           , H.button_ "etm-btn etm-ml-auto"
               { onClick: dispatch <| ToggleExpanded
               , disabled: false
@@ -219,29 +239,45 @@ withTimeMachine' keybindings def = { init, update, view }
           ]
 
         controls =
-          H.div "etm-section etm-d-flex"
-          [ undoButton
-          , redoButton
+          H.div "etm-section etm-d-flex etm-p-sm"
+          [ undoButton "etm-icon-btn"
+          , redoButton "etm-icon-btn"
             -- Rewind
-          , H.button_ "etm-btn etm-ml-auto"
-              { onClick: dispatch <| TogglePaused }
-              if paused then "▶️" else "⏸️"
+          , playPauseButton
+          , stopButton
             -- Fast forward
           ]
 
-        undoButton =
-          H.button_ "etm-btn"
+        undoButton className =
+          H.button_ ("etm-btn " <> className)
             { onClick: dispatch <| Undo
             , disabled: not History.hasPast history
             }
             "↩️"
 
-        redoButton =
-          H.button_ "etm-btn"
+        redoButton className =
+          H.button_ ("etm-btn " <> className)
             { onClick: dispatch <| Redo
             , disabled: not History.hasFuture history
             }
             "↪️"
+
+        playPauseButton =
+          H.button_ "etm-btn etm-icon-btn etm-ml-auto"
+            { onClick: dispatch <| case activity of
+                Playing -> Pause
+                _ -> Play
+            }
+            case activity of
+              Playing -> "⏸️"
+              _ -> "▶️"
+
+        stopButton =
+          H.button_ "etm-btn etm-icon-btn"
+            { onClick: dispatch <| Stop
+            , disabled: activity == Stopped
+            }
+            "⏹️"
 
         whenExpanded f =
           case expanded of
@@ -317,7 +353,6 @@ stylesheet = H.style ""
     }
 
     div.etm-body {
-      padding: 0.75rem 0 !important;
       border-top: 1px solid lightgray !important;
       max-height: 500px !important;
       overflow: auto !important;
@@ -374,8 +409,16 @@ stylesheet = H.style ""
       padding: 0.75rem !important;
     }
 
+    .etm-p-sm {
+      padding: 0.75rem !important;
+    }
+
     .etm-px-sm {
       padding: 0 0.75rem !important;
+    }
+
+    button.etm-btn.etm-icon-btn {
+      padding: 0 0.25rem !important;
     }
 
     pre.etm-code-block {
@@ -391,5 +434,9 @@ stylesheet = H.style ""
 
     .etm-d-flex {
       display: flex !important;
+    }
+
+    .etm-align-center {
+      align-items: center !important;
     }
   """

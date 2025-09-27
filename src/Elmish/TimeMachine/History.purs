@@ -11,12 +11,13 @@ module Elmish.TimeMachine.History
   , init
   , jump
   , latestMessage
-  , live
   , past
+  , play
   , present
   , presentState
   , redo
   , stash
+  , stop
   , track
   , undo
   )
@@ -161,10 +162,14 @@ jump distance history
     history
 
 -- | Go to the end state of the history
-live :: forall msg s. History msg s -> History msg s
-live history
-  | hasFuture history = live $ redo history
+play :: forall msg s. History msg s -> History msg s
+play history
+  | hasFuture history = play $ redo history
   | otherwise = history
+
+stop :: forall msg s. History msg s -> History msg s
+stop (History h) = History h
+  { future = Nil }
 
 -- Display
 
