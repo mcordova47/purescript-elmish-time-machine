@@ -25,6 +25,7 @@ module Elmish.TimeMachine.History
 
 import Prelude
 
+import Control.Monad.Rec.Class (Step(..), loop2, tailRec2)
 import Data.Array as Array
 import Data.Function.Uncurried (Fn2, Fn1, runFn1, runFn2)
 import Data.List (List(..), (:))
@@ -151,21 +152,23 @@ stash (History h) msg next = History h
 -- | Jumps the given distance, i.e. by a certain number of steps forward or
 -- | backwards
 jump :: forall msg s. Int -> History msg s -> History msg s
-jump distance history
-  | distance > 0
-  , hasFuture history =
-    jump (distance - 1) $ redo history
-  | distance < 0
-  , hasPast history =
-    jump (distance + 1) $ undo history
-  | otherwise =
-    history
+jump = tailRec2 go
+  where
+    go distance history
+      | distance > 0
+      , hasFuture history =
+        loop2 (distance - 1) $ redo history
+      | distance < 0
+      , hasPast history =
+        loop2 (distance + 1) $ undo history
+      | otherwise =
+        Done history
 
 -- | Go to the end state of the history
 play :: forall msg s. History msg s -> History msg s
 play history
-  | hasFuture history = play $ redo history
-  | otherwise = history
+  | not hasFuture history = history
+  | otherwise = play $ redo history
 
 stop :: forall msg s. History msg s -> History msg s
 stop (History h) = History h
