@@ -3,6 +3,7 @@ module Elmish.TimeMachine
   , Expanded
   , Keybindings
   , Message
+  , defaults
   , withTimeMachine
   , withTimeMachine'
   )
@@ -65,6 +66,7 @@ type State msg s =
   , visible :: Boolean
   , expanded :: Expanded
   , keybindings :: Keybindings
+  , playbackDelay :: Number
   }
 
 data Activity
@@ -99,22 +101,28 @@ withTimeMachine ::
   => ComponentDef msg state
   -> ComponentDef (Message msg) (State msg state)
 withTimeMachine =
-  withTimeMachine'
-    { toggle: \e ->
-        (KeyboardEvent.ctrlKey e || KeyboardEvent.metaKey e) &&
-        KeyboardEvent.altKey e &&
-        KeyboardEvent.code e == "KeyZ"
-    }
+  withTimeMachine' defaults
+
+defaults :: { keybindings :: Keybindings, playbackDelay :: Number }
+defaults =
+  { keybindings:
+      { toggle: \e ->
+          (KeyboardEvent.ctrlKey e || KeyboardEvent.metaKey e) &&
+          KeyboardEvent.altKey e &&
+          KeyboardEvent.code e == "KeyZ"
+     }
+  , playbackDelay: 100.0
+  }
 
 -- | A version of `withTimeMachine` that allows configuring the keybinding for
 -- | showing/hiding the time machine
 withTimeMachine' ::
   forall msg state
   . Debug.DebugWarning
-  => Keybindings
+  => { keybindings :: Keybindings, playbackDelay :: Number }
   -> ComponentDef msg state
   -> ComponentDef (Message msg) (State msg state)
-withTimeMachine' keybindings def = { init, update, view }
+withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
   where
     init = do
       subscribe Keydown keydownSub
@@ -125,6 +133,7 @@ withTimeMachine' keybindings def = { init, update, view }
         , visible: true
         , expanded: Collapsed
         , keybindings
+        , playbackDelay
         }
 
     update state = case _ of
@@ -174,7 +183,7 @@ withTimeMachine' keybindings def = { init, update, view }
             _ -> state.activity
         when (activity == Rewinding || activity == FastForwarding) $
           fork do
-            delay $ Milliseconds 100.0
+            delay $ Milliseconds state.playbackDelay
             pure TimeTravel
         pure state
           { history = case activity of
