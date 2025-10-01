@@ -177,9 +177,10 @@ stop (History h) = History h
 
 -- Display
 
--- | Formats a message (using its JS representation)
+-- | Formats a message, using either a full representation or a just the
+-- | constructor
 -- |
--- | E.g. `SetFoo 1` might look like `SetFoo2 {"value0": 1}`
+-- | E.g. `SetFoo 1` might look like `SetFoo2 1`
 formatMessage :: forall msg. Boolean -> Message msg -> String
 formatMessage full = case _ of
   Init -> "Initial State"
@@ -187,7 +188,7 @@ formatMessage full = case _ of
 
 foreign import formatMessage_ :: forall a. Fn2 Boolean a String
 
--- | Formats a given state by `JSON.stringify`ing it
+-- | Formats a given state
 formatState :: forall a. a -> String
 formatState = runFn1 formatState_
 
