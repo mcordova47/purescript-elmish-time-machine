@@ -11,7 +11,7 @@ const toString = (obj, topLevel) =>
   ? toStringObject(obj)
   : toStringCustom(obj, topLevel)
 
-const toStringArray = (arr) => `[${arr.map(toString)}]`
+const toStringArray = (arr) => `[${arr.map(toString).join(", ")}]`
 
 const toStringObject = (obj) =>
   chain(Object.keys(obj)).chain((keys) =>
