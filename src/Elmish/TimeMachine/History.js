@@ -1,15 +1,15 @@
-export const formatMessage_ = (full, msg) => full ? toString(msg) : msg.constructor.name
+export const formatMessage_ = (full, msg) => full ? toString(msg, true) : msg.constructor.name
 
-export const formatState_ = (state) => toString(state)
+export const formatState_ = (state) => toString(state, true)
 
-const toString = (obj) =>
+const toString = (obj, topLevel) =>
   ["number", "string", "boolean"].includes(typeof obj)
   ? JSON.stringify(obj)
   : obj.constructor.name === "Array"
   ? toStringArray(obj)
   : obj.constructor.name === "Object"
   ? toStringObject(obj)
-  : toStringCustom(obj)
+  : toStringCustom(obj, topLevel)
 
 const toStringArray = (arr) => `[${arr.map(toString)}]`
 
@@ -24,7 +24,17 @@ const toStringObject = (obj) =>
 
 const toStringKeyValue = (obj) => (k) => `${toString(k)}: ${toString(obj[k])}`
 
-const toStringCustom = (obj) => `${obj.constructor.name} ${toStringObject(obj)}`
+const toStringCustom = (obj, topLevel) =>
+  topLevel
+  ? `${obj.constructor.name} ${toStringObject(obj)}`
+  : hasValues(obj)
+  ? `(${obj.constructor.name} ${toStringObject(obj)})`
+  : obj.constructor.name
+
+const hasValues = (obj) =>
+  chain(Object.keys(obj)).chain((keys) =>
+    keys.length > 0 && keys.every((k) => /value\d+$/.test(k))
+  ).result
 
 const chain = (x) => ({
   chain: (fn) => chain(fn(x)),
