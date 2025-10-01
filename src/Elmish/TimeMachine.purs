@@ -436,6 +436,9 @@ stylesheet = H.style ""
       border-radius: 0.5rem !important;
       background-color: white !important;
       width: 300px !important;
+      color: #212529 !important;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
+      line-height: 1.5 !important;
     }
 
     div.etm-header {
@@ -461,6 +464,9 @@ stylesheet = H.style ""
       padding: 0.375rem 0.75rem !important;
       font-size: 1rem !important;
       border-radius: 0.25rem !important;
+      margin: 0;
+      font-family: inherit;
+      line-height: inherit;
     }
 
     button.etm-btn[disabled] {
@@ -474,14 +480,18 @@ stylesheet = H.style ""
     pre.etm-history-event {
       cursor: pointer !important;
       overflow: hidden !important;
-      word-wrap: nowrap !important;
       text-overflow: ellipsis !important;
       margin: 0 !important;
       padding: 0.5rem 0.75rem !important;
+      direction: ltr !important;
+      unicode-bidi: bidi-override !important;
+      white-space: pre !important;
+      display: block !important;
+      font-size: .875rem !important;
     }
 
     pre.etm-history-event:hover {
-      background-color: #e6f5ff;
+      background-color: #e6f5ff !important;
     }
 
     div.etm-section {
@@ -490,6 +500,14 @@ stylesheet = H.style ""
 
     div.etm-section:last-child {
       border-bottom: none !important;
+    }
+
+    .etm-container h6 {
+      font-weight: 500 !important;
+      line-height: 1.2 !important;
+      font-size: 1rem !important;
+      margin-top: 0 !important;
+      margin-bottom: 0.5rem !important;
     }
 
     h6.etm-section-header {
@@ -518,10 +536,24 @@ stylesheet = H.style ""
       padding: 0.75rem 0.5rem !important;
       border: 1px solid lightgray !important;
       border-radius: 0.25rem !important;
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      direction: ltr !important;
+      unicode-bidi: bidi-override !important;
+      white-space: pre !important;
+      display: block !important;
+      font-size: .875em !important;
+      overflow: auto !important;
+      display: block;
+      margin-top: 0;
+      margin-bottom: 1rem;;
     }
 
     code.etm-code {
       color: #656565 !important;
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      font-size: .875em !important;
+      direction: ltr !important;
+      unicode-bidi: bidi-override !important;
     }
 
     .etm-d-flex {
