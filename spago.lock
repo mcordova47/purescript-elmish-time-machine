@@ -17,6 +17,7 @@
             {
               "elmish": ">=0.13.0 <0.14.0"
             },
+            "elmish-hooks",
             {
               "elmish-html": ">=0.9.0 <0.10.0"
             },
@@ -73,6 +74,7 @@
             "effect",
             "either",
             "elmish",
+            "elmish-hooks",
             "elmish-html",
             "enums",
             "exceptions",
@@ -900,6 +902,20 @@
         "unsafe-coerce",
         "web-dom",
         "web-html"
+      ]
+    },
+    "elmish-hooks": {
+      "type": "registry",
+      "version": "0.10.3",
+      "integrity": "sha256-Lbf4mED+z67NLCOmzOF/eUlo/nSsp3yB4tZriU10l0E=",
+      "dependencies": [
+        "aff",
+        "debug",
+        "elmish",
+        "maybe",
+        "prelude",
+        "tuples",
+        "undefined-is-not-a-problem"
       ]
     },
     "elmish-html": {

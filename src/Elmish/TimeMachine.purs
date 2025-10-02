@@ -11,6 +11,7 @@ module Elmish.TimeMachine
 
 import Prelude
 
+import Data.Array as Array
 import Data.Foldable (fold, for_)
 import Data.Function.Uncurried (Fn2, runFn2)
 import Data.Maybe (Maybe(..))
@@ -24,8 +25,10 @@ import Effect.Class (liftEffect)
 import Elmish (ComponentDef, ReactElement, fork, forks, lmap, subscribe, (<|))
 import Elmish.Component (ComponentName(..), wrapWithLocalState)
 import Elmish.HTML.Styled as H
+import Elmish.Hooks ((=/>))
+import Elmish.Hooks as Hooks
 import Elmish.Subscription (Subscription(..))
-import Elmish.TimeMachine.History (History, formatMessage, formatState)
+import Elmish.TimeMachine.History (History, Value(..), formatMessage, formatValue, toValue)
 import Elmish.TimeMachine.History as History
 import Web.DOM (Element)
 import Web.DOM.Document (createElement) as DOM
@@ -247,11 +250,13 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
           , section
               { section: Present, expanded: sections, bodyClass: "etm-px-sm" }
               [ H.h6 "" "Last Message"
-              , H.pre "etm-code-block" $
-                  formatMessage true $ History.latestMessage history
+              , H.div "etm-code-block" $
+                  formatCollapsibleMessage $
+                    History.latestMessage history
               , H.h6 "" "Current State"
-              , H.pre "etm-code-block" $
-                  formatState $ History.presentState history
+              , H.div "etm-code-block" $
+                  formatCollapsible { expanded: true, parens: false } $
+                    toValue $ History.presentState history
               ]
           , section
               { section: Future, expanded: sections, bodyClass: "" } $
@@ -371,6 +376,98 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
           where
             title = "Fast Forward"
 
+        formatCollapsibleMessage = case _ of
+          History.Init ->
+            H.text "Initial State"
+          History.Message msg ->
+            formatCollapsible { expanded: true, parens: false } $
+              toValue msg
+
+        formatCollapsible props val =
+          Hooks.useState props.expanded =/> \nodeExpanded setNodeExpanded -> case val of
+            VCustom tag args ->
+              H.fragment
+              [ guard (nodeExpanded && parens) $
+                  H.div "" "("
+              , H.text
+                  if nodeExpanded then
+                    tag
+                  else
+                    formatCollapsed { parens: true } val
+              , guard (not Array.null args) $
+                  H.button_ "etm-btn etm-icon-btn etm-btn-sm"
+                    { onClick: setNodeExpanded <| not nodeExpanded
+                    }
+                    if nodeExpanded then "▼" else "▶"
+              , if nodeExpanded then
+                  H.fragment
+                  [ H.div "etm-pl-sm" $
+                      H.div "" <<< formatCollapsible { expanded: false, parens: true } <$> args
+                  , guard parens $
+                      H.div "" ")"
+                  ]
+                else
+                  H.empty
+              ]
+              where
+                parens = props.parens && not Array.null args
+            VObject obj ->
+              H.fragment
+              [ H.text if nodeExpanded then "{" else "{…}"
+              , H.button_ "etm-btn etm-icon-btn etm-btn-sm"
+                  { onClick: setNodeExpanded <| not nodeExpanded
+                  }
+                  if nodeExpanded then "▼" else "▶"
+              , if nodeExpanded then
+                  H.fragment
+                  [ H.div "etm-pl-sm" $
+                      H.fragment $ obj <#> \{ key, value } ->
+                        H.div "" $
+                        [ H.text $ formatCollapsed { parens: false } key
+                        , H.text ": "
+                        , formatCollapsible { expanded: false, parens: false } value
+                        , H.text ","
+                        ]
+                  , H.div "" "}"
+                  ]
+                else
+                  H.empty
+              ]
+            VArray arr ->
+              H.fragment
+              [ H.text if nodeExpanded then "[" else "[…]"
+              , H.button_ "etm-btn etm-icon-btn etm-btn-sm"
+                  { onClick: setNodeExpanded <| not nodeExpanded
+                  }
+                  if nodeExpanded then "▼" else "▶"
+              , if nodeExpanded then
+                  H.fragment
+                  [ H.div "etm-pl-sm" $
+                      H.fragment $ arr <#> \value ->
+                        H.div "" $
+                        [ formatCollapsible { expanded: false, parens: false } value
+                        , H.text ","
+                        ]
+                  , H.div "" "]"
+                  ]
+                else
+                  H.empty
+              ]
+            VPrim _ ->
+              H.text $
+                formatValue val
+
+        formatCollapsed { parens } = case _ of
+          VCustom tag args -> Array.fold
+            [ guard (parens && not Array.null args) "("
+            , tag
+            , guard (not Array.null args) " …"
+            , guard (parens && not Array.null args) ")"
+            ]
+          VObject _ -> "{…}"
+          VArray _ -> "[…]"
+          VPrim prim -> formatValue $ VPrim prim
+
         whenExpanded f =
           case expanded of
             Expanded sections -> f sections
@@ -473,6 +570,10 @@ stylesheet = H.style ""
       cursor: default !important;
     }
 
+    button.etm-btn.etm-btn-sm {
+      font-size: 0.75rem !important;
+    }
+
     .etm-ml-auto {
       margin-left: auto !important;
     }
@@ -527,11 +628,16 @@ stylesheet = H.style ""
       padding: 0 0.75rem !important;
     }
 
+    .etm-pl-sm {
+      padding-left: 0.75rem !important;
+    }
+
     button.etm-btn.etm-icon-btn {
       padding: 0 0.25rem !important;
     }
 
-    pre.etm-code-block {
+    pre.etm-code-block, div.etm-code-block {
+      white-space: pre !important;
       background-color: #efefef !important;
       padding: 0.75rem 0.5rem !important;
       border: 1px solid lightgray !important;
@@ -539,7 +645,6 @@ stylesheet = H.style ""
       font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
       direction: ltr !important;
       unicode-bidi: bidi-override !important;
-      white-space: pre !important;
       display: block !important;
       font-size: .875em !important;
       overflow: auto !important;
