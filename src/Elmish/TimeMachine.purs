@@ -14,10 +14,13 @@ import Prelude
 import Data.Array as Array
 import Data.Foldable (fold, for_)
 import Data.Function.Uncurried (Fn2, runFn2)
+import Data.Lazy (defer, force)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (guard)
 import Data.Set (Set)
 import Data.Set as Set
+import Data.String (trim)
+import Data.Tuple.Nested ((/\))
 import Debug as Debug
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
@@ -25,7 +28,6 @@ import Effect.Class (liftEffect)
 import Elmish (ComponentDef, ReactElement, fork, forks, lmap, subscribe, (<|))
 import Elmish.Component (ComponentName(..), wrapWithLocalState)
 import Elmish.HTML.Styled as H
-import Elmish.Hooks ((=/>))
 import Elmish.Hooks as Hooks
 import Elmish.Subscription (Subscription(..))
 import Elmish.TimeMachine.History (History, Value(..), formatMessage, formatValue, toValue)
@@ -383,75 +385,59 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
             formatCollapsible { expanded: true, parens: false } $
               toValue msg
 
-        formatCollapsible props val =
-          Hooks.useState props.expanded =/> \nodeExpanded setNodeExpanded -> case val of
+        formatCollapsible props val = Hooks.component Hooks.do
+          nodeExpanded /\ setNodeExpanded <- Hooks.useState props.expanded
+
+          let
+            toggleBtn :: forall a. _ -> _ a -> _ -> _
+            toggleBtn l items r =
+              if Array.null items then
+                H.text $ trim $ l <> r
+              else
+                H.button_ "etm-btn etm-icon-btn etm-btn-sm etm-btn-highlight"
+                  { onClick: setNodeExpanded <| not nodeExpanded
+                  }
+                  if nodeExpanded then
+                    l <> " ▼"
+                  else
+                    l <> "…" <> r <> " ▶"
+
+            content :: forall a. _ -> _ a -> (a -> _) -> _
+            content r items fmt =
+              guardLazy nodeExpanded \_ ->
+                H.fragment
+                [ H.div "etm-pl-sm" $
+                    H.div "" <<< fmt <$> items
+                , fold $ H.div "" <$> r
+                ]
+
+          Hooks.pure case val of
             VCustom tag args ->
               H.fragment
               [ guard (nodeExpanded && parens) $
                   H.div "" "("
-              , H.text
-                  if nodeExpanded then
-                    tag
-                  else
-                    formatCollapsed { parens: true } val
-              , guard (not Array.null args) $
-                  H.button_ "etm-btn etm-icon-btn etm-btn-sm"
-                    { onClick: setNodeExpanded <| not nodeExpanded
-                    }
-                    if nodeExpanded then "▼" else "▶"
-              , if nodeExpanded then
-                  H.fragment
-                  [ H.div "etm-pl-sm" $
-                      H.div "" <<< formatCollapsible { expanded: false, parens: true } <$> args
-                  , guard parens $
-                      H.div "" ")"
-                  ]
-                else
-                  H.empty
+              , toggleBtn (tag <> " ") args ""
+              , content (guard parens $ Just ")") args $
+                  formatCollapsible { expanded: false, parens: true }
               ]
               where
                 parens = props.parens && not Array.null args
             VObject obj ->
               H.fragment
-              [ H.text if nodeExpanded then "{" else "{…}"
-              , H.button_ "etm-btn etm-icon-btn etm-btn-sm"
-                  { onClick: setNodeExpanded <| not nodeExpanded
-                  }
-                  if nodeExpanded then "▼" else "▶"
-              , if nodeExpanded then
-                  H.fragment
-                  [ H.div "etm-pl-sm" $
-                      H.fragment $ obj <#> \{ key, value } ->
-                        H.div "" $
-                        [ H.text $ formatCollapsed { parens: false } key
-                        , H.text ": "
-                        , formatCollapsible { expanded: false, parens: false } value
-                        , H.text ","
-                        ]
-                  , H.div "" "}"
+              [ toggleBtn "{" obj "}"
+              , content (Just "}") obj \{ key, value } ->
+                  H.div "" $
+                  [ H.text $ formatCollapsed { parens: false } key
+                  , H.text ": "
+                  , formatCollapsible { expanded: false, parens: false } value
+                  , H.text ","
                   ]
-                else
-                  H.empty
               ]
             VArray arr ->
               H.fragment
-              [ H.text if nodeExpanded then "[" else "[…]"
-              , H.button_ "etm-btn etm-icon-btn etm-btn-sm"
-                  { onClick: setNodeExpanded <| not nodeExpanded
-                  }
-                  if nodeExpanded then "▼" else "▶"
-              , if nodeExpanded then
-                  H.fragment
-                  [ H.div "etm-pl-sm" $
-                      H.fragment $ arr <#> \value ->
-                        H.div "" $
-                        [ formatCollapsible { expanded: false, parens: false } value
-                        , H.text ","
-                        ]
-                  , H.div "" "]"
-                  ]
-                else
-                  H.empty
+              [ toggleBtn "[" arr "]"
+              , content (Just "]") arr $
+                  formatCollapsible { expanded: false, parens: false }
               ]
             VPrim _ ->
               H.text $
@@ -477,6 +463,8 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
           case expanded of
             Collapsed -> content
             Expanded _ -> H.empty
+
+        guardLazy p = force <<< guard p <<< defer
 
     keydownSub = Subscription \dispatch -> liftEffect do
       listener <- eventListener \e -> case KeyboardEvent.fromEvent e of
@@ -572,6 +560,10 @@ stylesheet = H.style ""
 
     button.etm-btn.etm-btn-sm {
       font-size: 0.75rem !important;
+    }
+
+    button.etm-btn.etm-btn-highlight:hover {
+      background-color: #cce7fe !important;
     }
 
     .etm-ml-auto {
