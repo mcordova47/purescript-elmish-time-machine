@@ -23,9 +23,7 @@
             {
               "elmish-hooks": ">=0.11.0 <0.12.0"
             },
-            {
-              "elmish-html": ">=0.9.0 <0.10.0"
-            },
+            "elmish-html",
             {
               "foldable-traversable": ">=6.0.0 <7.0.0"
             },
@@ -695,7 +693,22 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "elmish-hooks": {
+        "git": "https://github.com/collegevine/purescript-elmish-hooks.git",
+        "ref": "v0.11.0",
+        "dependencies": [
+          "aff",
+          "debug",
+          "effect",
+          "elmish",
+          "maybe",
+          "prelude",
+          "tuples",
+          "undefined-is-not-a-problem"
+        ]
+      }
+    }
   },
   "packages": {
     "aff": {
@@ -919,12 +932,13 @@
       ]
     },
     "elmish-hooks": {
-      "type": "registry",
-      "version": "0.10.3",
-      "integrity": "sha256-Lbf4mED+z67NLCOmzOF/eUlo/nSsp3yB4tZriU10l0E=",
+      "type": "git",
+      "url": "https://github.com/collegevine/purescript-elmish-hooks.git",
+      "rev": "80824e2dfc552a81982d16b32a545e1376bd630d",
       "dependencies": [
         "aff",
         "debug",
+        "effect",
         "elmish",
         "maybe",
         "prelude",
