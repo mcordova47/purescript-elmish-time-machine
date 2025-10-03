@@ -42,6 +42,6 @@ workspace:
         - purescript-maybe
         - purescript-prelude
         - purescript-tuples
-        - purescript-undefined-is-not-a-problem"
+        - purescript-undefined-is-not-a-problem
   packageSet:
     registry: 66.5.0
