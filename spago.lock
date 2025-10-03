@@ -5,6 +5,7 @@
         "path": "./",
         "core": {
           "dependencies": [
+            "aff",
             {
               "arrays": ">=7.3.0 <8.0.0"
             },
@@ -27,6 +28,7 @@
             {
               "functions": ">=6.0.0 <7.0.0"
             },
+            "lazy",
             {
               "lists": ">=7.0.0 <8.0.0"
             },
@@ -39,9 +41,12 @@
             {
               "prelude": ">=6.0.2 <7.0.0"
             },
+            "strings",
+            "tailrec",
             {
               "tuples": ">=7.0.0 <8.0.0"
             },
+            "unsafe-coerce",
             {
               "web-dom": ">=6.0.0 <7.0.0"
             },

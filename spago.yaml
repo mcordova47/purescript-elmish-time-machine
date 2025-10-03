@@ -1,7 +1,12 @@
 package:
   name: elmish-time-machine
   dependencies:
+    - aff
     - elmish-hooks
+    - lazy
+    - strings
+    - tailrec
+    - unsafe-coerce
     - arrays: ">=7.3.0 <8.0.0"
     - debug: ">=6.0.2 <7.0.0"
     - effect: ">=4.0.0 <5.0.0"
