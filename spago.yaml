@@ -6,7 +6,7 @@ package:
     - debug: ">=6.0.2 <7.0.0"
     - effect: ">=4.0.0 <5.0.0"
     - elmish: ">=0.13.0 <0.14.0"
-    - elmish-hooks: "*"
+    - elmish-hooks: ">=0.10.3 <0.11.0"
     - elmish-html: ">=0.9.0 <0.10.0"
     - foldable-traversable: ">=6.0.0 <7.0.0"
     - functions: ">=6.0.0 <7.0.0"
@@ -30,18 +30,6 @@ package:
       githubOwner: mcordova47
       githubRepo: purescript-elmish-time-machine
 workspace:
-  extraPackages:
-    elmish-hooks:
-      git: https://github.com/collegevine/purescript-elmish-hooks.git
-      ref: 0bdb439ceca83650c9e04a88380a0c6c4697f830
-      dependencies:
-        - elmish: ">=0.13.0 <0.14.0"
-        - aff
-        - debug
-        - effect
-        - maybe
-        - prelude
-        - tuples
-        - undefined-is-not-a-problem
+  extraPackages: {}
   packageSet:
     registry: 66.5.0
