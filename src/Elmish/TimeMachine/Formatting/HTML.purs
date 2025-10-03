@@ -30,7 +30,7 @@ formatCollapsible props val = Hooks.component Hooks.do
     toggleBtn :: ∀ a. _ -> _ a -> _ -> _
     toggleBtn l items r
       | Array.null items =
-        H.text $ trim $ l <> r
+        H.text $ trim (l <> r) <> guard props.comma ","
       | otherwise =
         H.div "etm-d-inline-flex"
         [ H.button_ "etm-btn etm-icon-btn etm-btn-sm etm-btn-highlight"
