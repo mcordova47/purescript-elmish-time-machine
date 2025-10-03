@@ -80,7 +80,7 @@ formatCollapsible props val = Hooks.component Hooks.do
       ]
     VPrim _ ->
       H.text $
-        F.formatValue val
+        F.formatValue val <> guard props.comma ","
 
 -- | A collapsible component tailored towards the `Message` type, which first
 -- | unwraps the message
