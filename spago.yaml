@@ -35,10 +35,10 @@ workspace:
       git: https://github.com/collegevine/purescript-elmish-hooks.git
       ref: 0bdb439ceca83650c9e04a88380a0c6c4697f830
       dependencies:
+        - elmish: ">=0.13.0 <0.14.0"
         - aff
         - debug
         - effect
-        - elmish
         - maybe
         - prelude
         - tuples

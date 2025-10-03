@@ -703,7 +703,9 @@
           "aff",
           "debug",
           "effect",
-          "elmish",
+          {
+            "elmish": ">=0.13.0 <0.14.0"
+          },
           "maybe",
           "prelude",
           "tuples",
