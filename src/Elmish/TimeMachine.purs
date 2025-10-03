@@ -11,27 +11,24 @@ module Elmish.TimeMachine
 
 import Prelude
 
-import Data.Array as Array
 import Data.Foldable (fold, for_)
 import Data.Function.Uncurried (Fn2, runFn2)
-import Data.Lazy (defer, force)
 import Data.Maybe (Maybe(..))
 import Data.Monoid (guard)
 import Data.Set (Set)
 import Data.Set as Set
-import Data.String (trim)
 import Data.Tuple.Nested ((/\))
 import Debug as Debug
-import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Class (liftEffect)
-import Elmish (ComponentDef, ReactElement, fork, forks, lmap, subscribe, (<|))
-import Elmish.Component (ComponentName(..), wrapWithLocalState)
+import Elmish (ComponentDef, ReactElement, fork, lmap, subscribe, (<|))
 import Elmish.HTML.Styled as H
 import Elmish.Hooks as Hooks
 import Elmish.Subscription (Subscription(..))
-import Elmish.TimeMachine.History (History, Value(..), formatMessage, formatValue, toValue)
-import Elmish.TimeMachine.History as History
+import Elmish.TimeMachine.Formatting as F
+import Elmish.TimeMachine.Formatting.HTML as FH
+import Elmish.TimeMachine.Types.History (History)
+import Elmish.TimeMachine.Types.History as History
 import Web.DOM (Element)
 import Web.DOM.Document (createElement) as DOM
 import Web.DOM.Element as Element
@@ -101,13 +98,15 @@ type Keybindings =
 
 -- | Wraps a `ComponentDef` to add a "time machine" debug tool to the Elmish UI
 withTimeMachine ::
-  forall msg state
+  ∀ msg state
   . Debug.DebugWarning
   => ComponentDef msg state
   -> ComponentDef (Message msg) (State msg state)
 withTimeMachine =
   withTimeMachine' defaults
 
+-- | Default configuration for keybindings and the amount of delay when
+-- | rewinding or fastforwarding through events
 defaults :: { keybindings :: Keybindings, playbackDelay :: Number }
 defaults =
   { keybindings:
@@ -122,7 +121,7 @@ defaults =
 -- | A version of `withTimeMachine` that allows configuring the keybinding for
 -- | showing/hiding the time machine
 withTimeMachine' ::
-  forall msg state
+  ∀ msg state
   . Debug.DebugWarning
   => { keybindings :: Keybindings, playbackDelay :: Number }
   -> ComponentDef msg state
@@ -215,23 +214,21 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
     view { history, activity, visible, expanded } dispatch =
       H.fragment
       [ def.view (History.presentState history) $ dispatch <<< Message
-      , guard visible $
-          portal
-            { id: "tardis-time-machine"
-            , content:
-                H.div_ "etm-container" { tabIndex: -1 }
-                [ header
-                , body
-                ]
-            }
+      , portal { id: "tardis-time-machine", visible } content
       , stylesheet
       ]
       where
+        content =
+          H.div_ "etm-container" { tabIndex: -1 }
+          [ header
+          , body
+          ]
+
         header =
           H.div "etm-header"
           [ whenCollapsed $ undoButton ""
           , H.code "etm-code" $
-              formatMessage false $
+              F.formatMessage false $
                 History.latestMessage history
           , whenCollapsed $ redoButton ""
           , H.button_ "etm-btn etm-ml-auto"
@@ -253,12 +250,12 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
               { section: Present, expanded: sections, bodyClass: "etm-px-sm" }
               [ H.h6 "" "Last Message"
               , H.div "etm-code-block" $
-                  formatCollapsibleMessage $
+                  FH.formatCollapsibleMessage $
                     History.latestMessage history
               , H.h6 "" "Current State"
               , H.div "etm-code-block" $
-                  formatCollapsible { expanded: true, parens: false } $
-                    toValue $ History.presentState history
+                  FH.formatCollapsible { expanded: true, parens: false, comma: false } $
+                    F.toValue $ History.presentState history
               ]
           , section
               { section: Future, expanded: sections, bodyClass: "" } $
@@ -268,21 +265,23 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
         historyEvent { index, message } =
           H.pre_ "etm-history-event"
             { onClick: dispatch <| Jump index } $
-            formatMessage true message
+            F.formatMessage true message
 
-        section props content =
+        section props c =
           H.div "etm-section"
           [ H.h6_ "etm-section-header"
-            { onClick: dispatch <| ToggleSection props.section }
-            [ H.div "" case props.section of
-                Past -> "Past"
-                Present -> "Present"
-                Future -> "Future"
-            , H.div ""
-                if Set.member props.section props.expanded then "▼" else "▶"
-            ]
+              { onClick: dispatch <| ToggleSection props.section }
+              [ H.div "" case props.section of
+                  Past -> "Past"
+                  Present -> "Present"
+                  Future -> "Future"
+              , H.div ""
+                  if Set.member props.section props.expanded
+                    then "▼"
+                    else "▶"
+              ]
           , guard (Set.member props.section props.expanded) $
-              H.div ("etm-section-body " <> props.bodyClass) content
+              H.div ("etm-section-body " <> props.bodyClass) c
           ]
 
         controls =
@@ -296,26 +295,20 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
           ]
 
         undoButton className =
-          H.button_ ("etm-btn " <> className)
-            { onClick: dispatch <| Undo
+          controlButton className
+            { title: "Undo"
+            , message: Undo
             , disabled: not History.hasPast history
-            , title
-            , "aria-label": title
             }
             "↩️"
-          where
-            title = "Undo"
 
         redoButton className =
-          H.button_ ("etm-btn " <> className)
-            { onClick: dispatch <| Redo
+          controlButton className
+            { title: "Redo"
+            , message: Redo
             , disabled: not History.hasFuture history
-            , title
-            , "aria-label": title
             }
             "↪️"
-          where
-            title = "Redo"
 
         playPauseButton =
           case activity of
@@ -326,145 +319,62 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
             FastForwarding -> pauseButton
 
         playButton =
-          H.button_ "etm-btn etm-icon-btn"
-            { onClick: dispatch <| Play
-            , title
-            , "aria-label": title
+          controlButton "etm-icon-btn"
+            { title: "Play (Jump to end of history and continue live updates)"
+            , message: Play
+            , disabled: false
             }
             "▶️"
-          where
-            title = "Play (Jump to end of history and continue live updates)"
 
         pauseButton =
-          H.button_ "etm-btn etm-icon-btn"
-            { onClick: dispatch <| Pause
-            , title
-            , "aria-label": title
+          controlButton "etm-icon-btn"
+            { title: "Pause (Stash any future updates)"
+            , message: Pause
+            , disabled: false
             }
             "⏸️"
-          where
-            title = "Pause (Stash any future updates)"
 
         stopButton =
-          H.button_ "etm-btn etm-icon-btn"
-            { onClick: dispatch <| Stop
+          controlButton "etm-icon-btn"
+            { title: "Stop (Stop updates and erase future)"
+            , message: Stop
             , disabled: activity == Stopped
-            , title
-            , "aria-label": title
             }
             "⏹️"
-          where
-            title = "Stop (Stop updates and erase future)"
 
         rewindButton =
-          H.button_ "etm-btn etm-icon-btn etm-ml-auto"
-            { onClick: dispatch <| Rewind
+          controlButton "etm-icon-btn etm-ml-auto"
+            { title: "Rewind"
+            , message: Rewind
             , disabled: activity == Rewinding || not History.hasPast history
-            , title
-            , "aria-label": title
             }
             "⏪"
-          where
-            title = "Rewind"
 
         fastForwardButton =
-          H.button_ "etm-btn etm-icon-btn"
-            { onClick: dispatch <| FastForward
+          controlButton "etm-icon-btn"
+            { title: "Fast Forward"
+            , message: FastForward
             , disabled: activity == FastForwarding || not History.hasFuture history
+            }
+            "⏩"
+
+        controlButton className { title, message, disabled } =
+          H.button_ ("etm-btn " <> className)
+            { onClick: dispatch <| message
+            , disabled
             , title
             , "aria-label": title
             }
-            "⏩"
-          where
-            title = "Fast Forward"
-
-        formatCollapsibleMessage = case _ of
-          History.Init ->
-            H.text "Initial State"
-          History.Message msg ->
-            formatCollapsible { expanded: true, parens: false } $
-              toValue msg
-
-        formatCollapsible props val = Hooks.component Hooks.do
-          nodeExpanded /\ setNodeExpanded <- Hooks.useState props.expanded
-
-          let
-            toggleBtn :: forall a. _ -> _ a -> _ -> _
-            toggleBtn l items r =
-              if Array.null items then
-                H.text $ trim $ l <> r
-              else
-                H.button_ "etm-btn etm-icon-btn etm-btn-sm etm-btn-highlight"
-                  { onClick: setNodeExpanded <| not nodeExpanded
-                  }
-                  if nodeExpanded then
-                    l <> " ▼"
-                  else
-                    l <> "…" <> r <> " ▶"
-
-            content :: forall a. _ -> _ a -> (a -> _) -> _
-            content r items fmt =
-              guardLazy nodeExpanded \_ ->
-                H.fragment
-                [ H.div "etm-pl-sm" $
-                    H.div "" <<< fmt <$> items
-                , fold $ H.div "" <$> r
-                ]
-
-          Hooks.pure case val of
-            VCustom tag args ->
-              H.fragment
-              [ guard (nodeExpanded && parens) $
-                  H.div "" "("
-              , toggleBtn (tag <> " ") args ""
-              , content (guard parens $ Just ")") args $
-                  formatCollapsible { expanded: false, parens: true }
-              ]
-              where
-                parens = props.parens && not Array.null args
-            VObject obj ->
-              H.fragment
-              [ toggleBtn "{" obj "}"
-              , content (Just "}") obj \{ key, value } ->
-                  H.div "" $
-                  [ H.text $ formatCollapsed { parens: false } key
-                  , H.text ": "
-                  , formatCollapsible { expanded: false, parens: false } value
-                  , H.text ","
-                  ]
-              ]
-            VArray arr ->
-              H.fragment
-              [ toggleBtn "[" arr "]"
-              , content (Just "]") arr $
-                  formatCollapsible { expanded: false, parens: false }
-              ]
-            VPrim _ ->
-              H.text $
-                formatValue val
-
-        formatCollapsed { parens } = case _ of
-          VCustom tag args -> Array.fold
-            [ guard (parens && not Array.null args) "("
-            , tag
-            , guard (not Array.null args) " …"
-            , guard (parens && not Array.null args) ")"
-            ]
-          VObject _ -> "{…}"
-          VArray _ -> "[…]"
-          VPrim prim -> formatValue $ VPrim prim
 
         whenExpanded f =
           case expanded of
             Expanded sections -> f sections
             Collapsed -> H.empty
 
-        whenCollapsed content =
+        whenCollapsed c =
           case expanded of
-            Collapsed -> content
+            Collapsed -> c
             Expanded _ -> H.empty
-
-        guardLazy p = force <<< guard p <<< defer
 
     keydownSub = Subscription \dispatch -> liftEffect do
       listener <- eventListener \e -> case KeyboardEvent.fromEvent e of
@@ -476,37 +386,26 @@ withTimeMachine' { keybindings, playbackDelay } def = { init, update, view }
       pure $
          liftEffect $ W.window <#> toEventTarget >>= removeEventListener keydown listener false
 
-portal :: { id :: String, content :: ReactElement } -> ReactElement
-portal = wrapWithLocalState (ComponentName "Portal") \{ id, content } ->
-  { init: do
-      forks \{ dispatch } -> liftEffect do
-        mContainer <- elementById id
-        case mContainer of
-          Just container ->
-            dispatch container
-          Nothing -> do
-            doc <- W.document =<< W.window
-            mBody <- W.body doc
-            for_ mBody \b -> do
-              container <- DOM.createElement "div" $ W.toDocument doc
-              Element.setId id container
-              DOM.appendChild (Element.toNode container) (HTMLElement.toNode b)
-              dispatch container
-      pure Nothing
-  , update: \_ container -> pure $ Just container
-  , view: \container _ -> fold $
-      createPortal content <$> container
-  }
-  where
-    elementById :: String -> Effect (Maybe Element)
-    elementById id =
-      W.window
-      >>= W.document
-      <#> W.toNonElementParentNode
-      >>= W.getElementById id
+portal :: { id :: String, visible :: Boolean } -> ReactElement -> ReactElement
+portal { id, visible } content = Hooks.component Hooks.do
+  container /\ setContainer <- Hooks.useState Nothing
 
-createPortal :: ReactElement -> Element -> ReactElement
-createPortal = runFn2 createPortal_
+  Hooks.useEffect $ liftEffect do
+    document <- W.window >>= W.document
+    mContainer <- W.toNonElementParentNode document # W.getElementById id
+    case mContainer of
+      Just _ ->
+        setContainer mContainer
+      Nothing -> do
+        mBody <- W.body document
+        for_ mBody \body -> do
+          container' <- DOM.createElement "div" $ W.toDocument document
+          Element.setId id container'
+          DOM.appendChild (Element.toNode container') (HTMLElement.toNode body)
+          setContainer $ Just container'
+
+  Hooks.pure $ guard visible $ fold $
+    runFn2 createPortal_ content <$> container
 
 foreign import createPortal_ :: Fn2 ReactElement Element ReactElement
 
@@ -655,6 +554,10 @@ stylesheet = H.style ""
 
     .etm-d-flex {
       display: flex !important;
+    }
+
+    .etm-d-inline-flex {
+      display: inline-flex !important;
     }
 
     .etm-align-center {
