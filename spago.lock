@@ -20,10 +20,10 @@
             {
               "elmish": ">=0.13.0 <0.14.0"
             },
+            "elmish-hooks",
             {
-              "elmish-hooks": ">=0.11.0 <0.12.0"
+              "elmish-html": ">=0.9.0 <0.10.0"
             },
-            "elmish-html",
             {
               "foldable-traversable": ">=6.0.0 <7.0.0"
             },
