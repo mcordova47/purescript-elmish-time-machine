@@ -5,7 +5,7 @@ package:
     - arrays: ">=7.3.0 <8.0.0"
     - debug: ">=6.0.2 <7.0.0"
     - effect: ">=4.0.0 <5.0.0"
-    - elmish: ">=0.9.0 <0.14.0"
+    - elmish: ">=0.13.0 <0.14.0"
     - elmish-hooks: ">=0.10.3 <0.11.0"
     - elmish-html: ">=0.9.0 <0.10.0"
     - foldable-traversable: ">=6.0.0 <7.0.0"
@@ -24,12 +24,24 @@ package:
     - web-html: ">=4.1.0 <5.0.0"
     - web-uievents: ">=5.0.0 <6.0.0"
   publish:
-    version: 0.4.0
+    version: 0.3.1
     license: MIT
     location:
       githubOwner: mcordova47
       githubRepo: purescript-elmish-time-machine
 workspace:
-  extraPackages: {}
+  extraPackages:
+    elmish-hooks:
+      git: https://github.com/collegevine/purescript-elmish-hooks.git
+      ref: 0bdb439ceca83650c9e04a88380a0c6c4697f830
+      dependencies:
+        - aff
+        - debug
+        - effect
+        - elmish
+        - maybe
+        - prelude
+        - tuples
+        - undefined-is-not-a-problem
   packageSet:
     registry: 66.5.0
