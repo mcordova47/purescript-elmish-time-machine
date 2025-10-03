@@ -35,13 +35,13 @@ workspace:
       git: https://github.com/collegevine/purescript-elmish-hooks.git
       ref: v0.11.0
       dependencies:
-        - purescript-aff
-        - purescript-debug
-        - purescript-effect
-        - purescript-elmish
-        - purescript-maybe
-        - purescript-prelude
-        - purescript-tuples
-        - purescript-undefined-is-not-a-problem
+        - aff
+        - debug
+        - effect
+        - elmish
+        - maybe
+        - prelude
+        - tuples
+        - undefined-is-not-a-problem
   packageSet:
     registry: 66.5.0
