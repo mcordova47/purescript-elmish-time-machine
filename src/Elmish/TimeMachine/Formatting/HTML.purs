@@ -67,7 +67,7 @@ formatCollapsible props val = Hooks.component Hooks.do
       [ toggleBtn "{" obj "}"
       , content (Just "}") obj \{ key, value } ->
           H.div "" $
-          [ H.text $ formatCollapsed { parens: false } key
+          [ H.text $ formatKey key
           , H.text ": "
           , formatCollapsible { expanded: false, parens: false, comma: true } value
           ]
@@ -92,13 +92,13 @@ formatCollapsibleMessage = case _ of
     formatCollapsible { expanded: true, parens: false, comma: false } $
       F.toValue msg
 
-formatCollapsed :: ∀ r. { parens :: Boolean | r } -> Value -> String
-formatCollapsed { parens } = case _ of
+formatKey :: Value -> String
+formatKey = case _ of
   VCustom tag args -> Array.fold
-    [ guard (parens && not Array.null args) "("
+    [ guard (not Array.null args) "("
     , tag
     , guard (not Array.null args) " …"
-    , guard (parens && not Array.null args) ")"
+    , guard (not Array.null args) ")"
     ]
   VObject _ -> "{…}"
   VArray _ -> "[…]"
