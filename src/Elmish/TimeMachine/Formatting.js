@@ -1,7 +1,9 @@
 export const formatPrim_ = JSON.stringify
 
 export const fromJsValue_ = value =>
-  ["number", "string", "boolean"].includes(typeof value)
+  ["number", "string", "boolean", "undefined"].includes(typeof value)
+  ? { tag: "VPrim", value }
+  : value === null
   ? { tag: "VPrim", value }
   : value.constructor.name === "Array"
   ? { tag: "VArray", value: value.map(fromJsValue_) }
